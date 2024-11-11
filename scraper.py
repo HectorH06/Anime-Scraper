@@ -1,3 +1,4 @@
+import pandas as pd
 from bs4 import BeautifulSoup as bs
 import requests
 import os
@@ -5,30 +6,7 @@ import re
 import subprocess
 from dotenv import load_dotenv
 
-# Massive download
-
-login_url = "https://anitaku.bz/login.html"
-
-# Diccionario con base_url como clave y el nombre de la serie como valor
-series_dict = {
-    "https://anitaku.bz/category/spy-kyoushitsu": "Spy_Kyoushitsu",
-    "https://anitaku.bz/category/spy-kyoushitsu-2nd-season": "Spy_Kyoushitsu2",
-    "https://anitaku.bz/category/isekai-nonbiri-houka": "Isekai_Nonbiri_Nouka",
-    "https://anitaku.bz/category/kage-no-jitsuryokusha-ni-naritakute": "Kage_no_Jitsuryokusha",
-    "https://anitaku.bz/category/kage-no-jitsuryokusha-ni-naritakute-2nd-season": "Kage_no_Jitsuryokusha2",
-    "https://anitaku.bz/category/fantasy-bishoujo-juniku-ojisan-to": "Fantasy_Bishoujo",
-    "https://anitaku.bz/category/koori-zokusei-danshi-to-cool-na-douryou-joshi": "Koori_Zokusei_Danshi",
-    "https://anitaku.bz/category/otonari-ni-ginga": "Otonari_ni_Ginga",
-    "https://anitaku.bz/category/liar-liar": "Liar_Liar",
-    "https://anitaku.bz/category/one-room-hiatari-futsuu-tenshi-tsuki": "One_Room,_Hiatari_Futsuu,_Tenshi-tsuki",
-    "https://anitaku.bz/category/shin-no-nakama-ja-nai-to-yuusha-no-party-wo-oidasareta-node-henkyou-de-slow-life-suru-koto-ni-shimashita": "Shin_no_Nakama_ja_nai_to_Yuusha",
-    "https://anitaku.bz/category/shin-no-nakama-ja-nai-to-yuusha-no-party-wo-oidasareta-node-henkyou-de-slow-life-suru-koto-ni-shimashita-2nd": "Shin_no_Nakama_ja_nai_to_Yuusha2",
-    "https://anitaku.bz/category/temple": "Temple",
-    "https://anitaku.bz/category/temple-specials": "Temple_Specials",
-    "https://anitaku.bz/category/kami-wa-game-ni-ueteiru": "Kami_wa_Game_ni_Ueteiru",
-    "https://anitaku.bz/category/bartender-kami-no-glass": "Bartender-Kami_no_Glass"
-}
-
+#region Setup and info extraction
 load_dotenv('.secrets')
 
 email = os.getenv('EMAIL')
@@ -37,15 +15,28 @@ file_path = os.getenv('FILE_PATH')
 
 quality = 4
 firstep = 1
-lastep = 20
-idm = True # Sin idm, 5 episodios de máxima calidad tardan aproximadamente 15 minutos, con IDM tardan aproximadamente 3 minutos
+lastep = 26
+idm = False # Cambia a True si quieres usar IDM, False para usar requests
 epiString = True
 
-episodios_descargas = {}
+def cargar_series_dict(ruta_archivo):
+    df = pd.read_excel(ruta_archivo, usecols=[0, 1], header=None)
+    df[1] = df[1].str.replace(' ', '_')
+    series_dict = dict(zip(df[0], df[1]))
+    return series_dict
 
+ruta_excel = 'series.xlsx'
+series_dict = cargar_series_dict(ruta_excel)
+
+login_url = "https://anitaku.bz/login.html"
+
+episodios_descargas = {}
+#endregion
+
+#region Session
 def transformar_url(url_base, numero_episodio):
     url_modificada = re.sub(r"/category", "", url_base)
-    if(epiString):
+    if epiString:
         episodio_url = f"{url_modificada}-episode-{numero_episodio}"
     else:
         episodio_url = f"{url_modificada}-{numero_episodio}"
@@ -65,10 +56,11 @@ login_data = {
 }
 
 login_response = session.post(login_url, data=login_data)
+#endregion
 
+#region IDM
 def obtener_links_descarga(session, url):
     response = session.get(url)
-    
     if response.status_code == 200:
         soup = bs(response.content, 'html.parser')
         list_download_div = soup.find('div', class_='list_dowload')
@@ -89,16 +81,37 @@ def obtener_links_descarga(session, url):
             print("No se encontró el div 'list_dowload'.")
     else:
         print(f"Error al acceder a la página. Código de estado: {response.status_code}")
-    
     return None
+#endregion
 
+#region Requests
+def descargar_sin_idm(episodios_dict, serie_folder):
+    for episodio, url_descarga in episodios_dict.items():
+        if url_descarga:
+            numero_episodio = re.search(r'-episode-(\d+)(?!.*\d)', episodio).group(1)
+            file_name = f"{serie}_Episode_{numero_episodio}.mp4"
+            file_full_path = os.path.join(serie_folder, file_name)
+            
+            print(f"Descargando {file_name} desde {url_descarga} ...")
+            
+            with requests.get(url_descarga, stream=True) as r:
+                r.raise_for_status()
+                with open(file_full_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            print(f"Descarga completa: {file_name}")
+#endregion
+
+#region Download
 if "Logout" in login_response.text:
     print("Login exitoso!")
-    
     for base_url, serie in series_dict.items():
         episodios_descargas = {}
-        
         print(f"\nDescargando episodios de la serie: {serie}")
+        
+        # Crear un directorio para la serie
+        serie_folder = os.path.join(file_path, serie)
+        os.makedirs(serie_folder, exist_ok=True)
         
         for i in range(firstep, lastep + 1):
             episodio_url = transformar_url(base_url, i)
@@ -114,32 +127,30 @@ if "Logout" in login_response.text:
         print(f"\nDiccionario de episodios con sus links de descarga para la serie {serie}:")
         print(episodios_descargas)
 
-        # Función de descarga con IDM
-        def descargar_con_idm(episodios_dict):
-            idm_path = r"C:\Program Files (x86)\Internet Download Manager\IDMan.exe"  # Ruta de IDM, ajusta si es necesario
-            if not os.path.exists(idm_path):
-                print("IDM no se encontró en la ruta especificada.")
-                return
-            
-            for episodio, url_descarga in episodios_dict.items():
-                if url_descarga:
-                    numero_episodio = re.search(r'-episode-(\d+)(?!.*\d)', episodio).group(1)
-                    file_name = f"{serie}_Episode_{numero_episodio}.mp4"
-                    file_full_path = os.path.join(file_path, file_name)
-                    
-                    print(f"Descargando {file_name} desde {url_descarga} ...")
-                    
-                    subprocess.run([idm_path, "/d", url_descarga, "/p", file_path, "/f", file_name, "/n", "/a"])
-            
-            # Comienza todas las descargas agregadas a la cola
-            subprocess.run([idm_path, "/s"])
-            print("Todas las descargas se han añadido a IDM.")
-
         if idm:
-            descargar_con_idm(episodios_descargas)
+            def descargar_con_idm(episodios_dict, serie_folder):
+                idm_path = r"C:\Program Files (x86)\Internet Download Manager\IDMan.exe" 
+                if not os.path.exists(idm_path):
+                    print("IDM no se encontró en la ruta especificada.")
+                    return
+                
+                for episodio, url_descarga in episodios_dict.items():
+                    if url_descarga:
+                        numero_episodio = re.search(r'-episode-(\d+)(?!.*\d)', episodio).group(1)
+                        file_name = f"{serie}_Episode_{numero_episodio}.mp4"
+                        file_full_path = os.path.join(serie_folder, file_name)
+                        
+                        print(f"Descargando {file_name} desde {url_descarga} ...")
+                        
+                        subprocess.run([idm_path, "/d", url_descarga, "/p", serie_folder, "/f", file_name, "/n", "/a"])
+                
+                subprocess.run([idm_path, "/s"])
+                print("Todas las descargas se han añadido a IDM.")
+            
+            descargar_con_idm(episodios_descargas, serie_folder)
         else:
-            # Aquí puedes agregar una función para descargar sin IDM si lo prefieres
-            pass
+            descargar_sin_idm(episodios_descargas, serie_folder)
 
 else:
     print("Error en el login")
+#endregion

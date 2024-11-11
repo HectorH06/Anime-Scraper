@@ -8,7 +8,7 @@
 ██║  ██║██║ ╚████║██║██║ ╚═╝ ██║███████╗    ███████║╚██████╗██║  ██║██║  ██║██║     ███████╗██║  ██║
 ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝╚═╝     ╚═╝╚══════╝    ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 
-       by HectorH06 (@HectorH06)          version 0.0
+       by HectorH06 (@HectorH06)          version 2.1
 ```
 
 ### General Description
@@ -36,8 +36,8 @@ This is an scraper for anime that searches within the HTML of anitaku pages and 
    - Series name
    - First and last episode
 - Manages corner cases for not standarized URLs
+- For the massive download you just have to set a column for urls and a second one for the name of the series (no need to worry for spaces, it replaces them automatically for underscores)
 
 ## Future Features
 
 - GUI
-- May turn massive download arguments to an object instead of dict
