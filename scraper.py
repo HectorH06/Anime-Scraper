@@ -16,7 +16,7 @@ file_path = os.getenv('FILE_PATH')
 quality = 4
 firstep = 1
 lastep = 26
-idm = False # Cambia a True si quieres usar IDM, False para usar requests
+idm = True # Cambia a True si quieres usar IDM, False para usar requests
 epiString = True
 
 def cargar_series_dict(ruta_archivo):
