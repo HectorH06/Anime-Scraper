@@ -13,7 +13,7 @@
 
 ### General Description
 
-This is an scraper for anime that searches within the HTML of anitaku pages and extracts the best quality links for each episode.
+This is a scraper for anime that searches within the HTML of anitaku pages and extracts the best quality links for each episode.
 
 ```diff
 - EDUCATIONAL PURPOSES ONLY
